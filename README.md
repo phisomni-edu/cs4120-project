@@ -6,24 +6,24 @@ Comparing few-shot, zero-shot, and supervised approaches to multi-class emotion 
 
 ## Repo Structure
 
-cs4120-project/
-├── README.md
-├── requirements.txt
-├── data/
-│   └── README.md
-├── notebooks/
-│   ├── 00_eda.ipynb                 # Person 1 — EDA, preprocessing, subsampling
-│   ├── 01_svm_baseline.ipynb        # Person 4 — TF-IDF + SVM baseline
-│   ├── 02_distilbert.ipynb          # Person 2 — DistilBERT fine-tuning
-│   ├── 03_setfit.ipynb              # Person 3 — SetFit few-shot experiments
-│   ├── 04_zero_shot.ipynb           # Person 4 — Zero-shot classification
-│   └── 05_analysis_viz.ipynb        # Person 4 — Analysis and visualizations
-├── src/
-│   ├── data_utils.py                # Shared subsampling and preprocessing utilities
-│   ├── evaluate.py                  # Shared evaluation framework
-│   └── label_mapping.py             # Emotion grouping logic
-└── results/
-    └── README.md
+cs4120-project/    
+├── README.md    
+├── requirements.txt    
+├── data/    
+│   └── README.md    
+├── notebooks/    
+│   ├── 00_eda.ipynb                 # Person 1 — EDA, preprocessing, subsampling    
+│   ├── 01_svm_baseline.ipynb        # Person 4 — TF-IDF + SVM baseline    
+│   ├── 02_distilbert.ipynb          # Person 2 — DistilBERT fine-tuning    
+│   ├── 03_setfit.ipynb              # Person 3 — SetFit few-shot experiments    
+│   ├── 04_zero_shot.ipynb           # Person 4 — Zero-shot classification    
+│   └── 05_analysis_viz.ipynb        # Person 4 — Analysis and visualizations    
+├── src/    
+│   ├── data_utils.py                # Shared subsampling and preprocessing utilities    
+│   ├── evaluate.py                  # Shared evaluation framework    
+│   └── label_mapping.py             # Emotion grouping logic    
+└── results/    
+    └── README.md    
 
 ---
 
