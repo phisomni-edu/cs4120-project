@@ -118,12 +118,6 @@ results_df.to_csv('results/{your_method}_results.csv', index=False)
 
 ---
 
-## Notebook Instructions
-
-Detailed setup cells and step-by-step instructions for each notebook are in [`notebooks/INSTRUCTIONS.md`](notebooks/INSTRUCTIONS.md).
-
----
-
 ## Dependencies
 
 All dependencies are installed automatically in each notebook's setup cell. No local installation required.
