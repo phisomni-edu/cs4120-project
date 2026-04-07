@@ -1,0 +1,2 @@
+method,data_fraction,seed,accuracy,macro_f1,micro_f1,hamming_loss
+zero_shot_bart,0.0,42,0.0,0.07116729733869837,0.0785318125702493,0.658203690541999
