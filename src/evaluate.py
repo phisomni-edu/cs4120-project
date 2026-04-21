@@ -1,8 +1,4 @@
-from __future__ import annotations
-
-import json
 from pathlib import Path
-from typing import Any, Dict, Iterable
 
 import numpy as np
 import pandas as pd
@@ -13,11 +9,7 @@ from sklearn.metrics import (
 )
 
 
-ArrayLike = Iterable[Iterable[int]] | np.ndarray | pd.DataFrame
-
-
-def _to_binary_numpy(values: ArrayLike, name: str) -> np.ndarray:
-    """Convert array-like inputs to a 2D integer numpy array."""
+def _to_binary_numpy(values, name):
     if isinstance(values, pd.DataFrame):
         arr = values.to_numpy()
     else:
@@ -26,13 +18,12 @@ def _to_binary_numpy(values: ArrayLike, name: str) -> np.ndarray:
     if arr.ndim != 2:
         raise ValueError(f"{name} must be 2D (n_samples, n_labels). Got shape {arr.shape}.")
 
-    # Coerce boolean/float/int predictions into {0, 1} ints.
+    # coerce bool/float/int-like predictions to strict multilabel binary form.
     arr = (arr > 0).astype(int)
     return arr
 
 
-def _validate_binary_inputs(y_true: np.ndarray, y_pred: np.ndarray, label_names: list[str]) -> None:
-    """Validate shape agreement and label cardinality."""
+def _validate_binary_inputs(y_true, y_pred, label_names):
     if y_true.shape != y_pred.shape:
         raise ValueError(
             f"y_true and y_pred shape mismatch: {y_true.shape} vs {y_pred.shape}."
@@ -45,16 +36,9 @@ def _validate_binary_inputs(y_true: np.ndarray, y_pred: np.ndarray, label_names:
         )
 
 
-def compute_overall_metrics(
-    y_true: ArrayLike,
-    y_pred: ArrayLike,
-    *,
-    zero_division: int = 0,
-) -> Dict[str, float]:
+def compute_overall_metrics(y_true, y_pred, *, zero_division=0):
     """
-    Compute overall multilabel metrics.
-
-    Returns:
+    return:
     - accuracy: exact-match subset accuracy (for multilabel)
     - macro_f1: unweighted F1 across labels
     - micro_f1: globally aggregated F1
@@ -68,6 +52,7 @@ def compute_overall_metrics(
             f"y_true and y_pred shape mismatch: {y_true_np.shape} vs {y_pred_np.shape}."
         )
 
+    # sklearn "accuracy" here is exact-match subset accuracy for multilabel data.
     accuracy = accuracy_score(y_true_np, y_pred_np)
     macro_f1 = precision_recall_fscore_support(
         y_true_np,
@@ -91,17 +76,9 @@ def compute_overall_metrics(
     }
 
 
-def compute_per_class_metrics(
-    y_true: ArrayLike,
-    y_pred: ArrayLike,
-    label_names: list[str],
-    *,
-    zero_division: int = 0,
-) -> pd.DataFrame:
+def compute_per_class_metrics(y_true, y_pred, label_names, *, zero_division=0):
     """
-    Compute per-class precision/recall/F1/support and confusion counts.
-
-    Returns columns:
+    returns columns:
     emotion, precision, recall, f1, support, tp, fp, fn, tn
     """
     y_true_np = _to_binary_numpy(y_true, "y_true")
@@ -120,6 +97,7 @@ def compute_per_class_metrics(
         y_t = y_true_np[:, idx]
         y_p = y_pred_np[:, idx]
 
+        # keep explicit confusion components for later diagnostics.
         tp = int(np.sum((y_t == 1) & (y_p == 1)))
         fp = int(np.sum((y_t == 0) & (y_p == 1)))
         fn = int(np.sum((y_t == 1) & (y_p == 0)))
@@ -142,16 +120,7 @@ def compute_per_class_metrics(
     return pd.DataFrame(per_class_rows)
 
 
-def build_overall_report(
-    *,
-    method: str,
-    data_fraction: float,
-    seed: int,
-    y_true: ArrayLike,
-    y_pred: ArrayLike,
-    zero_division: int = 0,
-) -> pd.DataFrame:
-    """Build one-row overall report with experiment metadata."""
+def build_overall_report(*, method, data_fraction, seed, y_true, y_pred, zero_division=0):
     metrics = compute_overall_metrics(y_true, y_pred, zero_division=zero_division)
     row = {
         "method": method,
@@ -162,23 +131,7 @@ def build_overall_report(
     return pd.DataFrame([row])
 
 
-def build_per_class_report(
-    *,
-    method: str,
-    data_fraction: float,
-    seed: int,
-    label_names: list[str],
-    y_true: ArrayLike,
-    y_pred: ArrayLike,
-    zero_division: int = 0,
-) -> pd.DataFrame:
-    """
-    Build per-class report with experiment metadata.
-
-    Output format is compatible with project result aggregation:
-    method, data_fraction, seed, emotion, f1, precision, recall
-    (plus support/tp/fp/fn/tn for debugging/analysis)
-    """
+def build_per_class_report(*, method, data_fraction, seed, label_names, y_true, y_pred, zero_division=0):
     df = compute_per_class_metrics(
         y_true,
         y_pred,
@@ -186,23 +139,14 @@ def build_per_class_report(
         zero_division=zero_division,
     )
 
+    # metadata-first column order makes downstream concatenation/reporting simpler.
     df.insert(0, "seed", int(seed))
     df.insert(0, "data_fraction", float(data_fraction))
     df.insert(0, "method", method)
     return df
 
 
-def evaluate_run(
-    *,
-    method: str,
-    data_fraction: float,
-    seed: int,
-    label_names: list[str],
-    y_true: ArrayLike,
-    y_pred: ArrayLike,
-    zero_division: int = 0,
-) -> Dict[str, Any]:
-    """Run shared evaluation and return both overall and per-class reports."""
+def evaluate_run(*, method, data_fraction, seed, label_names, y_true, y_pred, zero_division=0):
     y_true_np = _to_binary_numpy(y_true, "y_true")
     y_pred_np = _to_binary_numpy(y_pred, "y_pred")
     _validate_binary_inputs(y_true_np, y_pred_np, label_names)
@@ -231,36 +175,14 @@ def evaluate_run(
     }
 
 
-def save_results_csv(df: pd.DataFrame, output_path: str | Path) -> Path:
-    """Save a dataframe to CSV and return resolved path."""
+def save_results_csv(df, output_path):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
     return output_path.resolve()
 
 
-def save_json_summary(payload: Dict[str, Any], output_path: str | Path) -> Path:
-    """Save JSON summary and return resolved path."""
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-    return output_path.resolve()
-
-
-def save_evaluation_outputs(
-    evaluation: Dict[str, pd.DataFrame],
-    *,
-    method: str,
-    output_dir: str | Path = "results",
-) -> Dict[str, Path]:
-    """
-    Save shared evaluation outputs to standard paths.
-
-    Writes:
-    - {output_dir}/{method}_overall.csv
-    - {output_dir}/{method}_per_class.csv
-    """
+def save_evaluation_outputs(evaluation, *, method, output_dir="results"):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

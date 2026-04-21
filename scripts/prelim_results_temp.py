@@ -58,6 +58,7 @@ def frac_key(x: float) -> str:
 
 
 def by_frac(rows, metric):
+    # group metric values so we can average over seeds later.
     d = defaultdict(list)
     for r in rows:
         d[float(r["data_fraction"])].append(float(r[metric]))
@@ -98,7 +99,7 @@ def summarize():
     if not zero_overall:
         raise SystemExit("Missing required file: zero_shot_overall.csv")
 
-    # Coverage
+    # coverage
     coverage = {}
     for model in TRAINED_MODELS:
         rows = loaded[model["key"]]["overall"]
@@ -141,7 +142,7 @@ def summarize():
     lines.append(f"- {ZERO_SHOT['name']} fractions: {[frac_key(x) for x in zero_fracs]} | seeds: {zero_seeds}")
     lines.append("- Note: zero-shot is evaluated at 0% train fraction (no fitting), duplicated across seeds.\n")
 
-    # Macro table
+    # macro-f1 table
     lines.append("## Macro-F1 by Common Fraction (seed-mean)")
     lines.append("fraction | setfit_macro | distilbert_macro | svm_macro | best_model")
     lines.append("---|---:|---:|---:|---")
@@ -157,7 +158,7 @@ def summarize():
         lines.append(f"{frac_key(frac)} | {f(sf)} | {f(db)} | {f(sv)} | {ranked[0][0]}")
     lines.append("")
 
-    # Accuracy table
+    # exact-match accuracy table
     lines.append("## Exact-Match Accuracy by Common Fraction (seed-mean)")
     lines.append("fraction | setfit_acc | distilbert_acc | svm_acc | best_model")
     lines.append("---|---:|---:|---:|---")
@@ -173,7 +174,7 @@ def summarize():
         lines.append(f"{frac_key(frac)} | {f(sf)} | {f(db)} | {f(sv)} | {ranked[0][0]}")
     lines.append("")
 
-    # Zero-shot reference
+    # zero-shot reference
     zero_frac = zero_fracs[0]
     zero_macro_mean = mean(zero_macro[zero_frac])
     zero_acc_mean = mean(zero_acc[zero_frac])
@@ -183,7 +184,7 @@ def summarize():
     lines.append(f"{frac_key(zero_frac)} | {f(zero_macro_mean)} | {f(zero_acc_mean)}")
     lines.append("")
 
-    # Seed-42 snapshot
+    # seed-42 snapshot
     lines.append("## Seed-42 apples-to-apples snapshot")
     lines.append("fraction | setfit_macro | distilbert_macro | svm_macro | zero_macro | best_model")
     lines.append("---|---:|---:|---:|---:|---")
@@ -202,7 +203,7 @@ def summarize():
         lines.append(f"{frac_key(frac)} | {f(sf)} | {f(db)} | {f(sv)} | {f(zv)} | {ranked[0][0]}")
     lines.append("")
 
-    # Per-class comparisons at max common fraction
+    # per-class comparisons at max common fraction
     compare_frac = max(common_fracs)
     sf_pc = per_class_map(loaded["setfit"]["per_class"], compare_frac, 42)
     db_pc = per_class_map(loaded["distilbert"]["per_class"], compare_frac, 42)
@@ -234,7 +235,7 @@ def summarize():
         lines.append(f"- {emo}: {f(dlt)} (DistilBERT {f(dbv)} vs Zero-shot {f(zv)})")
     lines.append("")
 
-    # Draft narrative
+    # draft narrative
     sf_best = mean(metrics["setfit"]["macro"][compare_frac])
     db_best = mean(metrics["distilbert"]["macro"][compare_frac])
     sv_best = mean(metrics["svm"]["macro"][compare_frac])
@@ -273,4 +274,3 @@ def summarize():
 
 if __name__ == "__main__":
     summarize()
-

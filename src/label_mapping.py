@@ -1,9 +1,7 @@
-from typing import Dict, Iterable, List, Sequence
+# GoEmotions labels grouped into Ekman's six basic emotions
+# labels that do not cleanly map to Ekman are assigned to "other"
 
-
-# GoEmotions labels grouped into Ekman's six basic emotions.
-# Labels that do not cleanly map to Ekman are assigned to "other".
-EKMAN_6_GROUP_MAPPING: Dict[str, str] = {
+EKMAN_6_GROUP_MAPPING = {
     "admiration": "joy",
     "amusement": "joy",
     "anger": "anger",
@@ -35,8 +33,9 @@ EKMAN_6_GROUP_MAPPING: Dict[str, str] = {
 }
 
 
-# Coarser sentiment-style grouping used in many class-balance analyses.
-POS_NEG_AMBIGUOUS_NEUTRAL_MAPPING: Dict[str, str] = {
+# coarser sentiment-style grouping used in many class-balance analyses
+
+POS_NEG_AMBIGUOUS_NEUTRAL_MAPPING = {
     "admiration": "positive",
     "amusement": "positive",
     "anger": "negative",
@@ -77,8 +76,8 @@ SUPPORTED_SCHEMES = {
 }
 
 
-def get_label_group_mapping(scheme: str) -> Dict[str, str]:
-    """Return label->group mapping for a supported grouping scheme."""
+def get_label_group_mapping(scheme):
+    # allow a few aliases so notebooks can pass human-friendly names.
     normalized = scheme.strip().lower()
 
     if normalized in {"ekman", "ekman6", "ekman_6"}:
@@ -91,13 +90,7 @@ def get_label_group_mapping(scheme: str) -> Dict[str, str]:
     )
 
 
-def validate_label_group_mapping(
-    label_names: Sequence[str],
-    mapping: Dict[str, str],
-    *,
-    allow_unmapped: bool = False,
-) -> List[str]:
-    """Validate mapping coverage and return the list of unmapped labels."""
+def validate_label_group_mapping(label_names, mapping, *, allow_unmapped=False):
     unmapped = [label for label in label_names if label not in mapping]
 
     if unmapped and not allow_unmapped:
@@ -108,20 +101,8 @@ def validate_label_group_mapping(
     return unmapped
 
 
-def map_labels_to_groups(
-    label_ids: Iterable[int],
-    id2label: Dict[int, str],
-    label_group_mapping: Dict[str, str],
-    *,
-    drop_unmapped: bool = False,
-    preserve_order: bool = False,
-) -> List[str]:
-    """
-    Map one example's label IDs to grouped label names.
-
-    Returns unique groups. By default groups are sorted for deterministic outputs.
-    """
-    groups: List[str] = []
+def map_labels_to_groups(label_ids, id2label, label_group_mapping, *, drop_unmapped=False):
+    groups = []
 
     for label_id in label_ids:
         label_name = id2label[label_id]
@@ -134,34 +115,17 @@ def map_labels_to_groups(
 
         groups.append(group)
 
-    if preserve_order:
-        deduped: List[str] = []
-        seen = set()
-        for group in groups:
-            if group not in seen:
-                deduped.append(group)
-                seen.add(group)
-        return deduped
-
+    # dedupe for multilabel rows while keeping deterministic ordering.
     return sorted(set(groups))
 
 
-def add_grouped_labels_column(
-    df,
-    id2label: Dict[int, str],
-    *,
-    scheme: str | None = None,
-    label_group_mapping: Dict[str, str] | None = None,
-    input_col: str = "labels",
-    output_col: str = "grouped_labels",
-    drop_unmapped: bool = False,
-):
-    """Add a grouped-label column to a dataframe using either a scheme or explicit mapping."""
+def add_grouped_labels_column(df, id2label, *, scheme=None, label_group_mapping=None, input_col="labels", output_col="grouped_labels", drop_unmapped=False):
     if label_group_mapping is None:
         if scheme is None:
             raise ValueError("Provide either `scheme` or `label_group_mapping`.")
         label_group_mapping = get_label_group_mapping(scheme)
 
+    # work on a copy to avoid mutating caller-owned dataframes in notebooks.
     df = df.copy()
     df[output_col] = df[input_col].apply(
         lambda label_ids: map_labels_to_groups(

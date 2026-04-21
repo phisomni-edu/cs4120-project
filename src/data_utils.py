@@ -1,12 +1,10 @@
 import re
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
 
 import numpy as np
 import pandas as pd
 from datasets import load_dataset
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MultiLabelBinarizer
 
 
 URL_PATTERN = re.compile(r"https?://\S+|www\.\S+")
@@ -54,13 +52,7 @@ def add_basic_columns(df, id2label):
     return df
 
 
-def basic_clean_text(
-    text,
-    lowercase=True,
-    remove_urls=True,
-    remove_user_refs=False,
-    remove_subreddit_refs=False,
-):
+def basic_clean_text(text, lowercase=True, remove_urls=True, remove_user_refs=False, remove_subreddit_refs=False):
     """
     Lightweight text cleaning.
     """
@@ -98,7 +90,7 @@ def _import_nltk_modules():
     return nltk, stopwords, WordNetLemmatizer, word_tokenize
 
 
-def ensure_nltk_resources(*, download: bool = False, use_lemmatizer: bool = False):
+def ensure_nltk_resources(*, download=False, use_lemmatizer=False):
     """
     Ensure required NLTK resources are available.
 
@@ -107,9 +99,10 @@ def ensure_nltk_resources(*, download: bool = False, use_lemmatizer: bool = Fals
     """
     nltk, _, _, _ = _import_nltk_modules()
 
+    # keep tokenizer + stopword corpora aligned with preprocess_with_nltk defaults.
     required = [
         ("tokenizers/punkt", "punkt"),
-        # Some NLTK versions require punkt_tab for word_tokenize.
+        # some nltk versions require punkt_tab for word_tokenize.
         ("tokenizers/punkt_tab", "punkt_tab"),
         ("corpora/stopwords", "stopwords"),
     ]
@@ -144,18 +137,7 @@ def ensure_nltk_resources(*, download: bool = False, use_lemmatizer: bool = Fals
     )
 
 
-def preprocess_with_nltk(
-    text,
-    *,
-    lowercase: bool = True,
-    remove_urls: bool = True,
-    remove_user_refs: bool = True,
-    remove_subreddit_refs: bool = True,
-    remove_stopwords: bool = True,
-    remove_non_alnum_tokens: bool = True,
-    lemmatize: bool = False,
-    download_nltk_resources: bool = False,
-):
+def preprocess_with_nltk(text, *, lowercase=True, remove_urls=True, remove_user_refs=True, remove_subreddit_refs=True, remove_stopwords=True, remove_non_alnum_tokens=True, lemmatize=False, download_nltk_resources=False):
     """
     NLTK-based preprocessing: tokenization + optional stopword removal/lemmatization.
     """
@@ -170,6 +152,7 @@ def preprocess_with_nltk(
     ensure_nltk_resources(download=download_nltk_resources, use_lemmatizer=lemmatize)
     _, stopwords, WordNetLemmatizer, word_tokenize = _import_nltk_modules()
 
+    # tokenize after coarse regex cleanup to reduce obvious noise.
     tokens = word_tokenize(cleaned)
 
     if remove_non_alnum_tokens:
@@ -212,15 +195,7 @@ def preprocess_for_transformer(text):
     )
 
 
-def apply_preprocessing(
-    train_df,
-    val_df,
-    test_df,
-    *,
-    mode: str = "regex",
-    use_lemmatizer: bool = False,
-    download_nltk_resources: bool = False,
-):
+def apply_preprocessing(train_df, val_df, test_df, *, mode="regex", use_lemmatizer=False, download_nltk_resources=False):
     """
     Add cleaned text columns.
 
@@ -246,6 +221,7 @@ def apply_preprocessing(
         return train_df, val_df, test_df
 
     if mode == "nltk":
+        # tf-idf text is intentionally more normalized than transformer text.
         tfidf_kwargs = {
             "lowercase": True,
             "remove_urls": True,
@@ -301,84 +277,20 @@ def remove_empty_rows(df, text_col="text_clean_transformer"):
     return df
 
 
-def make_binary_label_matrix(df, label_names):
-    """
-    Convert list-of-label-ids into multilabel binary matrix.
-    """
-    mlb = MultiLabelBinarizer(classes=list(range(len(label_names))))
-    y = mlb.fit_transform(df["labels"])
-    y_df = pd.DataFrame(y, columns=label_names)
-    return y_df, mlb
-
-
-def transform_binary_label_matrix(df, mlb, label_names):
-    """
-    Transform another split using an already-fit MultiLabelBinarizer.
-    """
-    y = mlb.transform(df["labels"])
-    y_df = pd.DataFrame(y, columns=label_names)
-    return y_df
-
-
-def subsample_rows(df, n_samples, random_state=42):
-    """
-    Simple random row subsample.
-    """
-    n_samples = min(n_samples, len(df))
-    return df.sample(n=n_samples, random_state=random_state).reset_index(drop=True)
-
-
-def subsample_multilabel_by_label_coverage(df, label_names, samples_per_label=8, random_state=42):
-    """
-    Build a smaller training subset while trying to keep coverage across labels.
-
-    Strategy:
-    - For each label, sample up to `samples_per_label` examples that contain it.
-    - Union all selected rows.
-    - Shuffle result.
-    """
-    rng = np.random.default_rng(random_state)
-
-    selected_indices = set()
-
-    for label_id in range(len(label_names)):
-        label_rows = df[df["labels"].apply(lambda ids: label_id in ids)]
-        if len(label_rows) == 0:
-            continue
-
-        take = min(samples_per_label, len(label_rows))
-        chosen = rng.choice(label_rows.index.to_numpy(), size=take, replace=False)
-        selected_indices.update(chosen.tolist())
-
-    sampled_df = df.loc[sorted(selected_indices)].sample(frac=1, random_state=random_state)
-    return sampled_df.reset_index(drop=True)
-
-
-def _make_labelset_stratify_keys(
-    labels_series: pd.Series,
-    *,
-    min_count_for_stratify: int = 2,
-    rare_bucket: str = "__RARE__",
-) -> pd.Series:
+def _make_labelset_stratify_keys(labels_series, *, min_count_for_stratify=2, rare_bucket="__RARE__"):
     """
     Build stratification keys from multilabel sets.
 
     Uses sorted label-tuples converted to strings and buckets rare combinations.
     """
+    # use sorted label-id signatures so equivalent label sets share one bucket.
     key_series = labels_series.apply(lambda ids: "|".join(str(i) for i in sorted(ids)))
     counts = key_series.value_counts()
     valid_keys = set(counts[counts >= min_count_for_stratify].index)
     return key_series.apply(lambda key: key if key in valid_keys else rare_bucket)
 
 
-def subsample_train_fraction(
-    train_df: pd.DataFrame,
-    fraction: float,
-    *,
-    random_state: int = 42,
-    strategy: str = "labelset_stratified",
-    label_col: str = "labels",
-) -> pd.DataFrame:
+def subsample_train_fraction(train_df, fraction, *, random_state=42, strategy="labelset_stratified", label_col="labels"):
     """
     Subsample a training dataframe by fraction.
 
@@ -417,24 +329,17 @@ def subsample_train_fraction(
         )
         return sampled_df.reset_index(drop=True)
     except ValueError:
-        # Fallback for very small/rare label distributions.
+        # fallback keeps the run moving for tiny/rare subsets.
         return train_df.sample(n=n_samples, random_state=random_state).reset_index(drop=True)
 
 
-def generate_fraction_subsamples(
-    train_df: pd.DataFrame,
-    *,
-    fractions: Sequence[float] = (0.01, 0.05, 0.10, 0.25, 0.50),
-    seeds: Iterable[int] = (42,),
-    strategy: str = "labelset_stratified",
-    label_col: str = "labels",
-) -> Dict[tuple, pd.DataFrame]:
+def generate_fraction_subsamples(train_df, *, fractions=(0.01, 0.05, 0.10, 0.25, 0.50), seeds=(42,), strategy="labelset_stratified", label_col="labels"):
     """
     Generate subsamples for each (fraction, seed) pair.
 
     Returns dict keyed by (fraction, seed).
     """
-    subsamples: Dict[tuple, pd.DataFrame] = {}
+    subsamples = {}
 
     for seed in seeds:
         for fraction in fractions:
@@ -449,12 +354,12 @@ def generate_fraction_subsamples(
     return subsamples
 
 
-def _fraction_to_pct_tag(fraction: float) -> str:
+def _fraction_to_pct_tag(fraction):
     pct = int(round(fraction * 100))
     return f"{pct}pct"
 
 
-def normalize_multilabel_column(df: pd.DataFrame, label_col: str = "labels") -> pd.DataFrame:
+def normalize_multilabel_column(df, label_col="labels"):
     """
     Normalize multilabel column values to plain Python int lists.
 
@@ -467,6 +372,7 @@ def normalize_multilabel_column(df: pd.DataFrame, label_col: str = "labels") -> 
         return df
 
     def _normalize_value(value):
+        # keep labels as plain python int lists for stable csv round-trips.
         if isinstance(value, list):
             return [int(x) for x in value]
         if isinstance(value, tuple):
@@ -542,35 +448,7 @@ def save_standard_splits(train_df, val_df, test_df, output_dir="data"):
     save_dataframe(test_df, output_dir / "test.csv")
 
 
-def save_subsampled_train_sets(train_df, label_names, output_dir="data", sample_sizes=(8, 16, 32), random_state=42):
-    """
-    Save multiple few-shot subsampled training sets (legacy helper).
-    """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    for k in sample_sizes:
-        sampled_df = subsample_multilabel_by_label_coverage(
-            train_df,
-            label_names=label_names,
-            samples_per_label=k,
-            random_state=random_state,
-        )
-        save_dataframe(sampled_df, output_dir / f"train_subsample_{k}.csv")
-
-
-def save_fraction_subsamples(
-    train_df: pd.DataFrame,
-    *,
-    output_dir: str = "data",
-    fractions: Sequence[float] = (0.01, 0.05, 0.10, 0.25, 0.50),
-    seeds: Iterable[int] = (42,),
-    strategy: str = "labelset_stratified",
-    label_col: str = "labels",
-    canonical_seed: int = 42,
-    write_seeded_files: bool = True,
-    write_canonical_aliases: bool = True,
-):
+def save_fraction_subsamples(train_df, *, output_dir="data", fractions=(0.01, 0.05, 0.10, 0.25, 0.50), seeds=(42,), strategy="labelset_stratified", label_col="labels", canonical_seed=42, write_seeded_files=True, write_canonical_aliases=True):
     """
     Save fraction-based training subsets for one or more seeds.
 
@@ -598,6 +476,7 @@ def save_fraction_subsamples(
             seeded_path = output_dir / f"train_{pct_tag}_seed{seed}.csv"
             save_dataframe(sampled_df, seeded_path)
 
+        # canonical aliases simplify single-seed notebook loading conventions.
         if write_canonical_aliases and int(seed) == int(canonical_seed):
             canonical_path = output_dir / f"train_{pct_tag}.csv"
             save_dataframe(sampled_df, canonical_path)

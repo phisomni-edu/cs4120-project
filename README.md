@@ -1,125 +1,99 @@
-# CS4120 Project: Few-Shot Emotion Detection
+# Emotion Classification - CS4120 Final Project
 
-Comparing few-shot, zero-shot, and supervised approaches to multi-class emotion classification on the GoEmotions dataset.
+GoEmotions emotion-classification project comparing four approaches across multiple training-data fractions:
 
----
+- tf-idf + linear svm baseline
+- distilbert fine-tuning
+- setfit few-shot learning
+- zero-shot bart-mnli
 
-## Repo Structure
+The repo includes:
 
-cs4120-project/    
-├── README.md    
-├── requirements.txt    
-├── data/    
-│   └── README.md    
-├── notebooks/    
-│   ├── 00_eda.ipynb                 # Person 1 — EDA, preprocessing, subsampling    
-│   ├── 01_svm_baseline.ipynb        # Person 4 — TF-IDF + SVM baseline    
-│   ├── 02_distilbert.ipynb          # Person 2 — DistilBERT fine-tuning    
-│   ├── 03_setfit.ipynb              # Person 3 — SetFit few-shot experiments    
-│   ├── 04_zero_shot.ipynb           # Person 4 — Zero-shot classification    
-│   └── 05_analysis_viz.ipynb        # Person 4 — Analysis and visualizations    
-├── src/    
-│   ├── data_utils.py                # Shared subsampling and preprocessing utilities    
-│   ├── evaluate.py                  # Shared evaluation framework    
-│   └── label_mapping.py             # Emotion grouping logic    
-└── results/    
-    └── README.md    
+- shared data/preprocessing utilities in `src/data_utils.py`
+- shared label grouping in `src/label_mapping.py`
+- shared multilabel evaluation in `src/evaluate.py`
+- experiment notebooks in `notebooks/`
+- result csv outputs in `results/`
 
----
+## Quick Start (local):
 
-## Getting Started
+1. clone the repo and enter it:
 
-All work is done in Google Colab. You do not need to install anything locally.
-
-### Step 1 — Open your notebook in Colab
-1. Go to [colab.research.google.com](https://colab.research.google.com)
-2. File → Open notebook → GitHub tab
-3. Paste the repo URL and select your notebook
-
-### Step 2 — Set the correct runtime
-Each notebook has a different runtime requirement — check the instructions at the top of your notebook before running anything.
-
-### Step 3 — Run the setup cell
-The first cell in every notebook handles installs, Drive mounting, and imports. Run it before anything else. When prompted, authorize Google Drive access.
-
-### Step 4 — Connect Colab to GitHub
-The first time you save (Ctrl+S), Colab will ask you to authorize GitHub access. Accept this — it allows Colab to save your notebook directly to the repo.
-
----
-
-## Workflow
-
-### Starting a session
-1. Open your notebook in Colab (Step 1 above)
-2. Set the correct runtime
-3. Run the setup cell
-4. You're ready to work
-
-### Saving your work
-There are three types of things to save:
-
-**Notebooks** — Ctrl+S saves the notebook directly to GitHub. Do this regularly as you work.
-
-**Results and figures** (CSVs, plots) — save these to the `results/` folder in the repo:
-1. Your code saves the file to `/content/results/` during the session
-2. Right-click the file in the Colab left sidebar → Download
-3. Go to the repo on GitHub → `results/` → Add file → Upload files → Commit
-
-**Model checkpoints** (large files) — these go to Google Drive, not GitHub:
-```python
-# Each notebook has the correct save call for its model — see notebook instructions
-model.save_pretrained(SAVE_DIR + "checkpoints/your_model")
+```bash
+git clone <repo-url>
+cd cs4120-project
 ```
 
----
+2. create and activate a virtual environment:
 
-## Data
-
-The dataset is loaded directly from Hugging Face — no manual download needed:
-
-```python
-from datasets import load_dataset
-dataset = load_dataset("google-research-datasets/go_emotions", "simplified")
+```bash
+python -m venv .venv
+source .venv/bin/activate  # windows powershell: .venv\\Scripts\\Activate.ps1
 ```
 
-**Dependency:** All notebooks except `00_eda.ipynb` load preprocessed data from the `data/` folder in this repo. Person 1 must commit the processed CSVs before anyone else can run their experiments. Check that the following files exist in `data/` before starting:
+3. install dependencies:
 
-```
-data/train.csv
-data/val.csv
-data/test.csv
-data/train_1pct.csv
-data/train_5pct.csv
-data/train_10pct.csv
-data/train_25pct.csv
-data/train_50pct.csv
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-Once they're there, load them like this:
-```python
-import pandas as pd
-train_df = pd.read_csv('data/train_10pct.csv')
-test_df = pd.read_csv('data/test.csv')
+4. start jupyter:
+
+```bash
+jupyter lab
 ```
 
----
+## Quick Start (Colab):
 
-## Results Format
+For `02_distilbert.ipynb` and `03_setfit.ipynb`, Colab GPU runtimes are recommended
 
-To make sure all results can be combined for the final analysis, save your results CSV in this format:
+1. open notebook in Colab.
+2. set runtime type to GPU.
+3. run cells top-to-bottom. setup cells clone the repo into `/content/cs4120-project` and install notebook-specific packages.
+4. if you want checkpoint backups, mount drive when prompted in notebooks that support it.
 
-| method | data_fraction | seed | emotion | f1 | precision | recall |
-|---|---|---|---|---|---|---|
-| setfit | 0.01 | 42 | joy | 0.72 | 0.74 | 0.70 |
+## Notebook Run Order:
 
-```python
-results_df.to_csv('results/{your_method}_results.csv', index=False)
-```
+Run in this order if starting from raw data:
 
----
+1. `notebooks/00_eda.ipynb`
+2. `notebooks/01_svm_baseline.ipynb`
+3. `notebooks/02_distilbert.ipynb`
+4. `notebooks/03_setfit.ipynb`
+5. `notebooks/04_zero_shot.ipynb`
+6. `notebooks/05_analysis_viz.ipynb`
 
-## Dependencies
+### What notebook 00 produces:
 
-All dependencies are installed automatically in each notebook's setup cell. No local installation required.
+All downstream notebooks expect processed files in `data/`:
 
-Key libraries: `transformers`, `datasets`, `setfit`, `accelerate`, `scikit-learn`, `pandas`, `numpy`, `matplotlib`, `seaborn`
+- `train.csv`, `val.csv`, `test.csv`
+- `train_clean.csv`, `validation_clean.csv`, `test_clean.csv`
+- fraction subsets: `train_1pct*.csv`, `train_5pct*.csv`, `train_10pct*.csv`, `train_25pct*.csv`, `train_50pct*.csv`
+
+If those files already exist (as in this repo), you can skip rerunning 00.
+
+## Running each experiment:
+
+- `01_svm_baseline.ipynb`: cpu is fine.
+- `02_distilbert.ipynb`: gpu strongly recommended.
+- `03_setfit.ipynb`: gpu strongly recommended.
+- `04_zero_shot.ipynb`: can run on cpu or gpu.
+- `05_analysis_viz.ipynb`: reads result csvs and generates figures.
+
+## Outputs:
+
+Main outputs are written to `results/`:
+
+- `svm_tfidf_overall.csv`, `svm_tfidf_per_class.csv`, `svm_tfidf_results.csv`
+- `distilbert_overall.csv`, `distilbert_per_class.csv`, `distilbert_results.csv`
+- `setfit_overall.csv`, `setfit_per_class.csv`, `setfit_results.csv`
+- `zero_shot_overall.csv`, `zero_shot_per_class.csv`, `zero_shot_results.csv`
+
+
+## Notes:
+
+- the task is multilabel emotion classification on goemotions.
+- shared metrics come from `src/evaluate.py` (accuracy, macro-f1, micro-f1, hamming loss + per-class metrics).
+- experiment seeds are typically `[42, 7, 21]` and fractions `[0.01, 0.05, 0.10, 0.25, 0.50, 1.00]`.
