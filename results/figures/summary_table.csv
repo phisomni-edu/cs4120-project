@@ -1,0 +1,8 @@
+Model,Data Fraction,Macro F1,Accuracy
+SVM (TF-IDF),5%,0.2798,0.2628
+SVM (TF-IDF),100%,0.3421,0.1443
+SetFit,5%,0.375,0.3903
+SetFit,100%,0.4401,0.4443
+BERT,5%,0.0,0.0
+BERT,100%,0.4167,0.461
+Zero-Shot BART,N/A,0.1903,0.0074
