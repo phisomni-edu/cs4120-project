@@ -52,6 +52,7 @@ For `02_distilbert.ipynb` and `03_setfit.ipynb`, Colab GPU runtimes are recommen
 2. set runtime type to GPU.
 3. run cells top-to-bottom. setup cells clone the repo into `/content/cs4120-project` and install notebook-specific packages.
 4. if you want checkpoint backups, mount drive when prompted in notebooks that support it.
+5. notebooks are local-first by default; google drive mount code is intentionally left commented so you can enable it only when needed.
 
 ## Notebook Run Order:
 
